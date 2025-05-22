@@ -77,9 +77,16 @@ jobs:
           # Limpiar la caché
           ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "cd $DEPLOY_PATH && php bin/console cache:clear --env=prod --no-debug"
 
-          # Crear base de datos si no existe y ejecutar migraciones
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "cd $DEPLOY_PATH && php bin/console doctrine:database:create --if-not-exists"
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "cd $DEPLOY_PATH && php bin/console doctrine:migrations:migrate --no-interaction"
-
           # Reiniciar Apache
           ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "sudo systemctl restart apache2"
+
+      - name: Crear la base de datos si no existe y ejecutar migraciones
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            php bin/console doctrine:database:create --if-not-exists
+            php bin/console doctrine:migrations:migrate --no-interaction
