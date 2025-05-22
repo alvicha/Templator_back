@@ -20,7 +20,7 @@ jobs:
 
       - name: Install dependencies
         run: composer install
-        working_directory: backend
+        working-directory: backend
 
       - name: Run tests
         run: ./vendor/bin/phpunit tests
