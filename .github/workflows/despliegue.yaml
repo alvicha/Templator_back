@@ -24,6 +24,7 @@ jobs:
 
       - name: Run tests
         run: ./vendor/bin/phpunit tests
+        working-directory: backend
 
   deploy:
     runs-on: ubuntu-latest
