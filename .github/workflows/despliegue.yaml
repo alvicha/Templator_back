@@ -86,12 +86,13 @@ jobs:
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
 
+            # Escapamos la contraseña (si tiene caracteres especiales)
+            ENCODED_PASS=$(php -r "echo urlencode('${MYSQL_PASSWORD}');")
+
             # Construir DATABASE_URL de forma correcta
-            DB_URL="mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}:3306/${MYSQL_DATABASE}?serverVersion=8.0"
+            echo "DATABASE_URL=mysql://${MYSQL_USER}:${ENCODED_PASS}@${MYSQL_HOST}:3306/${MYSQL_DATABASE}?serverVersion=5.7.40&charset=utf8mb4" > .env.local
 
-            echo "DATABASE_URL=$DB_URL" > .env.local
-
-            # Verificar que Symfony lo vea
+            echo "[INFO] .env.local generado:"
             cat .env.local
 
             # Ejecutar migraciones
