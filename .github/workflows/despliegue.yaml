@@ -1,4 +1,4 @@
-name: Deploy Symfony API with MySQL DB
+name: Deploy Symfony API with MySQL
 
 on:
   push:
@@ -61,12 +61,11 @@ jobs:
           # Sincronizar archivos (excluye tests y .git)
           rsync -avz --delete --exclude 'tests' --exclude '.git' backend/ $USERNAME@$HOST:$DEPLOY_PATH
 
-          # Crear o sobreescribir el archivo .htaccess con contenido básico
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "cat > $DEPLOY_PATH/.htaccess << 'EOF'
-          RewriteEngine On
-          RewriteCond %{REQUEST_FILENAME} !-f
-          RewriteRule ^ index.php [QSA,L]
-          EOF"
+          # Crear archivo .htaccess básico
+          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "echo -e '<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ index.php [QSA,L]\n</IfModule>' > $DEPLOY_PATH/public/.htaccess"
+
+          # Habilitar mod_rewrite
+          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "sudo a2enmod rewrite"
 
           # Instalar dependencias en el servidor
           ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "cd $DEPLOY_PATH && /usr/bin/composer install --no-dev --optimize-autoloader --no-scripts"
