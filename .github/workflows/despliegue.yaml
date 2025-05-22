@@ -74,17 +74,18 @@ jobs:
 
       - name: Configurar MySQL y ejecutar migraciones
         uses: appleboy/ssh-action@master
-        env:
-          MYSQL_DATABASE: proyecto
-          MYSQL_USER: templator
-          MYSQL_PASSWORD: templator1234
-          MYSQL_HOST: 54.157.114.249
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
+
+             # Definir los valores directamente (puedes usar secrets si prefieres)
+            MYSQL_DATABASE="proyecto"
+            MYSQL_USER="templator"
+            MYSQL_PASSWORD="templator1234"
+            MYSQL_HOST="54.157.114.249"
 
             # Escapamos la contraseña (si tiene caracteres especiales)
             ENCODED_PASS=$(php -r "echo urlencode('${MYSQL_PASSWORD}');")
