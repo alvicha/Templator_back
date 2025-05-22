@@ -61,6 +61,10 @@ jobs:
           # Sincronizar archivos (excluye tests y .git)
           rsync -avz --delete --exclude 'tests' --exclude '.git' backend/ $USERNAME@$HOST:$DEPLOY_PATH
 
+          # Ajustar permisos y propietario
+          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "sudo chown -R ubuntu:www-data $DEPLOY_PATH"
+          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "sudo chmod -R 775 $DEPLOY_PATH/var $DEPLOY_PATH/vendor $DEPLOY_PATH/public"
+
           # Crear archivo .htaccess básico
           ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "echo -e '<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ index.php [QSA,L]\n</IfModule>' > $DEPLOY_PATH/public/.htaccess"
 
