@@ -41,6 +41,7 @@ jobs:
 
       - name: Install dependencies
         run: composer install
+        working-directory: backend
 
       - name: Deploy to server
         env:
