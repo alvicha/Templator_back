@@ -59,7 +59,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "mkdir -p $DEPLOY_PATH"
 
           # Sincronizar archivos (excluye tests y .git)
-          rsync -avz --delete --exclude 'tests' --exclude '.git' . $USERNAME@$HOST:$DEPLOY_PATH
+          rsync -avz --delete --exclude 'tests' --exclude '.git' backend/ $USERNAME@$HOST:$DEPLOY_PATH
 
           # Instalar dependencias en el servidor
           ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "cd $DEPLOY_PATH && /usr/bin/composer install --no-dev --optimize-autoloader"
