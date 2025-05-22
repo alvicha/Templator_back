@@ -75,39 +75,25 @@ jobs:
       - name: Configurar MySQL y ejecutar migraciones
         uses: appleboy/ssh-action@master
         env:
-          MYSQL_ROOT_PASSWORD: TemplatorRoot1234
           MYSQL_DATABASE: proyecto
           MYSQL_USER: templator
           MYSQL_PASSWORD: templator1234
+          MYSQL_HOST: 54.157.114.249
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Definir variables para usar dentro del script
-            DB_NAME=$MYSQL_DATABASE
-            DB_USER=$MYSQL_USER
-            DB_PASSWORD=$MYSQL_PASSWORD
-
-            # Instalar MySQL si no está presente
-            sudo apt-get update
-            sudo apt-get install -y mysql-server
-
-            # Iniciar servicio MySQL
-            sudo systemctl start mysql
-
-            # Configurar base de datos y usuario
-            sudo mysql -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
-            sudo mysql -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
-            sudo mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
-            sudo mysql -e "FLUSH PRIVILEGES;"
-
-            # Permitir conexiones remotas (si es necesario)
-            sudo sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/mysql.conf.d/mysqld.cnf
-            sudo systemctl restart mysql
-
-            # Ejecutar migraciones Symfony
             cd ${{ secrets.DEPLOY_PATH }}
-            export DATABASE_URL="mysql://$DB_USER:$DB_PASSWORD@127.0.0.1:3306/$DB_NAME?serverVersion=5.7.40"
-            php bin/console doctrine:database:create --if-not-exists
-            php bin/console doctrine:migrations:migrate --no-interaction
+
+            # Construir DATABASE_URL de forma correcta
+            DB_URL="mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}:3306/${MYSQL_DATABASE}?serverVersion=8.0"
+
+            echo "DATABASE_URL=$DB_URL" > .env.local
+
+            # Verificar que Symfony lo vea
+            cat .env.local
+
+            # Ejecutar migraciones
+            php bin/console doctrine:database:create --if-not-exists --env=prod
+            php bin/console doctrine:migrations:migrate --no-interaction --env=prod
