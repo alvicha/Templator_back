@@ -114,7 +114,7 @@ jobs:
             cd "$DEPLOY_PATH"
             echo "APP_ENV=prod" > .env.local
             echo "APP_SECRET=${{ secrets.APP_SECRET }}" >> .env.local
-            echo "DATABASE_URL=mysql://$APP_USER:$APP_PASS@127.0.0.1:3306/$APP_DB?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
+            echo "DATABASE_URL=mysql://$APP_USER:$APP_PASS@54.157.114.249:3306/$APP_DB?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
 
             # Instalar dependencias y ejecutar migraciones
             composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
