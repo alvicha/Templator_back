@@ -126,3 +126,24 @@ jobs:
 
             # Reiniciar Apache para aplicar cambios
             sudo systemctl restart apache2
+
+            # Crear y activar servicio systemd para Symfony Messenger consumer
+            sudo tee /etc/systemd/system/messenger-consumer.service > /dev/null <<EOF
+            [Unit]
+            Description=Symfony Messenger Consumer Async
+            After=network.target
+
+            [Service]
+            User=${{ secrets.USERNAME }}
+            WorkingDirectory=$DEPLOY_PATH
+            ExecStart=/usr/bin/php $DEPLOY_PATH/bin/console messenger:consume async -vv
+            Restart=always
+            RestartSec=5s
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable messenger-consumer.service
+            sudo systemctl restart messenger-consumer.service
