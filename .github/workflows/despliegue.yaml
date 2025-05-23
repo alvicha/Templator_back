@@ -114,9 +114,10 @@ jobs:
 
             # Configurar .env.local
             cd "$DEPLOY_PATH"
+            cd "$DEPLOY_PATH"
             echo "APP_ENV=prod" > .env.local
             echo "APP_SECRET=${{ secrets.APP_SECRET }}" >> .env.local
-            echo "DATABASE_URL=mysql://$APP_USER:$APP_PASS@$SERVER_IP:3306/$APP_DB?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
+            echo "DATABASE_URL=mysql://$APP_USER:$APP_PASS@127.0.0.1:3306/$APP_DB?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
 
             # Dependencias y migraciones
             /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
