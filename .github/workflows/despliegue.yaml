@@ -7,8 +7,6 @@ on:
 
 env:
   MYSQL_PORT: 3306
-  DB_NAME: proyecto
-  DB_USER: templator
 
 jobs:
   test:
