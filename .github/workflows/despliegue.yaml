@@ -114,9 +114,6 @@ jobs:
             echo "DATABASE_URL=mysql://$DB_USER:${{ secrets.DB_PASSWORD }}@127.0.0.1:$MYSQL_PORT/$DB_NAME?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
 
             # Production deployment tasks
-            /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
-            php bin/console cache:clear --env=prod --no-debug
-            php bin/console cache:warmup --env=prod --no-debug
             php bin/console doctrine:migrations:migrate --no-interaction --env=prod
             php bin/console assets:install public --env=prod --no-debug
 
