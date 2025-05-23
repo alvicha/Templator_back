@@ -118,7 +118,7 @@ jobs:
             # Crear archivo .env.local con configuración prod
             echo "APP_ENV=prod" > .env.local
             echo "APP_SECRET=${{ secrets.APP_SECRET }}" >> .env.local
-            echo "DATABASE_URL=mysql://templator:templator1234@127.0.0.1:$MYSQL_PORT/templator_db?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
+            echo "DATABASE_URL=mysql://$APP_USER:$APP_PASS@127.0.0.1:$MYSQL_PORT/$APP_DB?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
 
             # Instalación de dependencias optimizada para prod y migraciones
             /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
