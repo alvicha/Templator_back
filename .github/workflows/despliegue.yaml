@@ -8,9 +8,7 @@ on:
 env:
   MYSQL_PORT: 3306
   DB_NAME: proyecto
-  DB_USER: appuser
-  DB_PASSWORD: AppUserPass456!
-  MYSQL_ROOT_PASSWORD: RootPass123!
+  DB_USER: templator
 
 jobs:
   test:
@@ -62,8 +60,10 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
 
+          # Create deployment directory and set permissions
           ssh $USERNAME@$HOST "mkdir -p $DEPLOY_PATH/{var,public}"
 
+          # Sync files excluding development resources
           rsync -avz --delete \
             --exclude='.git' \
             --exclude='.env.local' \
@@ -72,12 +72,15 @@ jobs:
             --exclude='phpunit.xml' \
             backend/ $USERNAME@$HOST:$DEPLOY_PATH
 
+          # Set proper permissions
           ssh $USERNAME@$HOST "sudo chown -R $USERNAME:www-data $DEPLOY_PATH"
           ssh $USERNAME@$HOST "sudo chmod -R 775 $DEPLOY_PATH/var"
           ssh $USERNAME@$HOST "sudo chmod -R 755 $DEPLOY_PATH/public"
 
+          # Configure Apache .htaccess
           ssh $USERNAME@$HOST "echo -e '<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ index.php [QSA,L]\n</IfModule>' > $DEPLOY_PATH/public/.htaccess"
 
+          # Enable Apache modules
           ssh $USERNAME@$HOST "sudo a2enmod rewrite headers"
 
       - name: Setup database and run migrations
@@ -87,36 +90,44 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Instalar cliente MySQL si es necesario
             if ! command -v mysql &> /dev/null; then
               sudo apt-get update
               sudo apt-get install -y mysql-client
             fi
 
-            MYSQL_ROOT_PASSWORD="RootPass123!"
-            DB_NAME="proyecto"
-            DB_USER="appuser"
-            DB_PASSWORD="AppUserPass456!"
-            MYSQL_PORT=3306
+            # Variables MySQL
+            MYSQL_ROOT_USER="root"
+            MYSQL_ROOT_PASS="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+            APP_DB="${{ secrets.MYSQL_DATABASE }}"
+            APP_USER="${{ secrets.MYSQL_USER }}"
+            APP_PASS="${{ secrets.MYSQL_PASSWORD }}"
 
-            MYSQL_VERSION=$(mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SELECT VERSION();" -s --skip-column-names | cut -d'-' -f1)
+            # Obtener versión de MySQL para Symfony config
+            MYSQL_VERSION=$(mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "SELECT VERSION();" -s --skip-column-names | cut -d'-' -f1)
 
-            mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "
-              CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-              CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';
-              GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'%';
+            # Crear base de datos y usuario app
+            mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "
+              CREATE DATABASE IF NOT EXISTS $APP_DB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+              CREATE USER IF NOT EXISTS '$APP_USER'@'%' IDENTIFIED BY '$APP_PASS';
+              GRANT ALL PRIVILEGES ON $APP_DB.* TO '$APP_USER'@'%';
               FLUSH PRIVILEGES;
             "
 
-            cd $DEPLOY_PATH/backend
+            # Ir a directorio backend
+            cd ${{ secrets.DEPLOY_PATH }}/backend
 
+            # Crear archivo .env.local con configuración prod
             echo "APP_ENV=prod" > .env.local
             echo "APP_SECRET=${{ secrets.APP_SECRET }}" >> .env.local
-            echo "DATABASE_URL=mysql://$DB_USER:$DB_PASSWORD@127.0.0.1:$MYSQL_PORT/$DB_NAME?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
+            echo "DATABASE_URL=mysql://$APP_USER:$APP_PASS@127.0.0.1:$MYSQL_PORT/$APP_DB?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
 
+            # Instalación de dependencias optimizada para prod y migraciones
             /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
             php bin/console cache:clear --env=prod --no-debug
             php bin/console cache:warmup --env=prod --no-debug
             php bin/console doctrine:migrations:migrate --no-interaction --env=prod
             php bin/console assets:install public --env=prod --no-debug
 
+            # Reiniciar Apache para aplicar cambios
             sudo systemctl restart apache2
