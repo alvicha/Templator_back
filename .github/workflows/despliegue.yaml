@@ -97,7 +97,7 @@ jobs:
             APP_DB="${{ secrets.MYSQL_DATABASE }}"
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
             APP_USER="templator"
-            APP_PASS="${{ secrets.MYSQL_TEMPLATOR_PASSWORD }}"
+            APP_PASS="${{ secrets.MYSQL_PASSWORD }}"
 
             # Crear base de datos si no existe
             mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "
