@@ -88,23 +88,20 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Instalar cliente MySQL si es necesario
-            if ! command -v mysql &> /dev/null; then
-              sudo apt-get update
-              sudo apt-get install -y mysql-client
-            fi
+            # Configurar MySQL para conexiones remotas
+            sudo sed -i 's/^bind-address\s*=.*/bind-address = 0.0.0.0/' /etc/mysql/mysql.conf.d/mysqld.cnf
+            sudo systemctl restart mysql
 
-            # Variables MySQL
+            # Variables
             MYSQL_ROOT_USER="root"
             MYSQL_ROOT_PASS="${{ secrets.MYSQL_ROOT_PASSWORD }}"
             APP_DB="${{ secrets.MYSQL_DATABASE }}"
             APP_USER="${{ secrets.MYSQL_USER }}"
             APP_PASS="${{ secrets.MYSQL_PASSWORD }}"
+            DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
+            SERVER_IP="$(hostname -I | awk '{print $1}')"
 
-            # Obtener versión de MySQL para Symfony config
-            MYSQL_VERSION=$(mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "SELECT VERSION();" -s --skip-column-names | cut -d'-' -f1)
-
-            # Crear base de datos y usuario app
+            # Crear DB y usuario
             mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "
               CREATE DATABASE IF NOT EXISTS $APP_DB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
               CREATE USER IF NOT EXISTS '$APP_USER'@'%' IDENTIFIED BY '$APP_PASS';
@@ -112,20 +109,21 @@ jobs:
               FLUSH PRIVILEGES;
             "
 
-            # Ir a directorio backend
-            cd ${{ secrets.DEPLOY_PATH }}
+            # Obtener versión MySQL
+            MYSQL_VERSION=$(mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "SELECT VERSION();" -s --skip-column-names | cut -d'-' -f1)
 
-            # Crear archivo .env.local con configuración prod
+            # Configurar .env.local
+            cd "$DEPLOY_PATH"
             echo "APP_ENV=prod" > .env.local
             echo "APP_SECRET=${{ secrets.APP_SECRET }}" >> .env.local
-            echo "DATABASE_URL=mysql://$APP_USER:$APP_PASS@127.0.0.1:$MYSQL_PORT/$APP_DB?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
+            echo "DATABASE_URL=mysql://$APP_USER:$APP_PASS@$SERVER_IP:3306/$APP_DB?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
 
-            # Instalación de dependencias optimizada para prod y migraciones
+            # Dependencias y migraciones
             /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
             php bin/console cache:clear --env=prod --no-debug
             php bin/console cache:warmup --env=prod --no-debug
             php bin/console doctrine:migrations:migrate --no-interaction --env=prod
             php bin/console assets:install public --env=prod --no-debug
 
-            # Reiniciar Apache para aplicar cambios
+            # Reiniciar Apache
             sudo systemctl restart apache2
