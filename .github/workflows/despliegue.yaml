@@ -99,7 +99,7 @@ jobs:
             APP_USER="${{ secrets.MYSQL_USER }}"
             MYSQL_ROOT_USER="root"
             MYSQL_ROOT_PASS="${{ secrets.MYSQL_ROOT_PASSWORD }}"
-            
+            APP_PASS="${{ secrets.MYSQL_PASSWORD }}"
 
             # Crear base de datos si no existe
             mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "
