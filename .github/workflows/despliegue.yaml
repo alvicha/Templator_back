@@ -96,12 +96,17 @@ jobs:
             MYSQL_ROOT_PASS="${{ secrets.MYSQL_ROOT_PASSWORD }}"
             APP_DB="${{ secrets.MYSQL_DATABASE }}"
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
-            APP_USER="templator"
-            APP_PASS="Templator1234!"
+            APP_USER="${{ secrets.MYSQL_USER }}"
+            APP_PASS="${{ secrets.MYSQL_PASSWORD }}"
 
             # Crear base de datos si no existe
             mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "
               CREATE DATABASE IF NOT EXISTS \`$APP_DB\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+              mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "
+              CREATE DATABASE IF NOT EXISTS \`$APP_DB\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+              CREATE USER IF NOT EXISTS '$APP_USER'@'%' IDENTIFIED BY '$APP_PASS';
+              GRANT ALL PRIVILEGES ON \`$APP_DB\`.* TO '$APP_USER'@'%';
+              FLUSH PRIVILEGES;
             "
 
             # Obtener versión de MySQL para Doctrine
