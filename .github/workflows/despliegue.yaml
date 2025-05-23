@@ -1,9 +1,14 @@
-name: Deploy Symfony API with MySQL DB
+name: Deploy Symfony API with MySQL
 
 on:
   push:
     branches:
       - main
+
+env:
+  DB_NAME: proyecto
+  DB_USER: templator
+  MYSQL_PORT: 3306
 
 jobs:
   test:
@@ -55,38 +60,65 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
 
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "mkdir -p $DEPLOY_PATH"
+          # Create deployment directory and set permissions
+          ssh $USERNAME@$HOST "mkdir -p $DEPLOY_PATH/{var,public}"
 
-          rsync -avz --delete --exclude 'tests' --exclude '.git' backend/ $USERNAME@$HOST:$DEPLOY_PATH
+          # Sync files excluding development resources
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='.env.local' \
+            --exclude='var/' \
+            --exclude='tests/' \
+            --exclude='phpunit.xml' \
+            backend/ $USERNAME@$HOST:$DEPLOY_PATH
 
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "sudo chown -R ubuntu:www-data $DEPLOY_PATH"
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "sudo chmod -R 775 $DEPLOY_PATH/var $DEPLOY_PATH/vendor $DEPLOY_PATH/public"
+          # Set proper permissions
+          ssh $USERNAME@$HOST "sudo chown -R $USERNAME:www-data $DEPLOY_PATH"
+          ssh $USERNAME@$HOST "sudo chmod -R 775 $DEPLOY_PATH/var"
+          ssh $USERNAME@$HOST "sudo chmod -R 755 $DEPLOY_PATH/public"
 
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "echo -e '<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ index.php [QSA,L]\n</IfModule>' > $DEPLOY_PATH/public/.htaccess"
+          # Configure Apache .htaccess
+          ssh $USERNAME@$HOST "echo -e '<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ index.php [QSA,L]\n</IfModule>' > $DEPLOY_PATH/public/.htaccess"
 
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "sudo a2enmod rewrite"
+          # Enable Apache modules
+          ssh $USERNAME@$HOST "sudo a2enmod rewrite headers"
 
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "cd $DEPLOY_PATH && /usr/bin/composer install --no-dev --optimize-autoloader --no-scripts"
-
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "cd $DEPLOY_PATH && php bin/console cache:clear --env=prod --no-debug"
-
-          ssh -o StrictHostKeyChecking=no $USERNAME@$HOST "sudo systemctl restart apache2"
-
-      - name: Crear base de datos y ejecutar migraciones
-        uses: appleboy/ssh-action@master
+      - name: Setup database and run migrations
+        uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Install MySQL client if needed
+            if ! command -v mysql &> /dev/null; then
+              sudo apt-get update
+              sudo apt-get install -y mysql-client
+            fi
+
+            # Get actual MySQL version
+            MYSQL_VERSION=$(mysql -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" -e "SELECT VERSION();" -s | cut -d'-' -f1)
+
+            # Database setup
             mysql -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" -e "
-              CREATE DATABASE IF NOT EXISTS proyecto CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-              CREATE USER IF NOT EXISTS 'templator'@'localhost' IDENTIFIED BY 'templator1234';
-              CREATE USER IF NOT EXISTS 'templator'@'127.0.0.1' IDENTIFIED BY 'templator1234';
-              GRANT ALL PRIVILEGES ON proyecto.* TO 'templator'@'localhost';
-              GRANT ALL PRIVILEGES ON proyecto.* TO 'templator'@'127.0.0.1';
+              CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+              CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '${{ secrets.DB_PASSWORD }}';
+              GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'%';
               FLUSH PRIVILEGES;
             "
-            cd ${{ secrets.DEPLOY_PATH }}
-            echo "DATABASE_URL=mysql://templator:templator1234@127.0.0.1:3306/proyecto?serverVersion=8.0&charset=utf8mb4" > .env.local
+
+            # Create .env.local with proper configuration
+            cd $DEPLOY_PATH
+            echo "APP_ENV=prod" > .env.local
+            echo "APP_SECRET=${{ secrets.APP_SECRET }}" >> .env.local
+            echo "DATABASE_URL=mysql://$DB_USER:${{ secrets.DB_PASSWORD }}@127.0.0.1:$MYSQL_PORT/$DB_NAME?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
+
+            # Production deployment tasks
+            /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+            php bin/console cache:clear --env=prod --no-debug
+            php bin/console cache:warmup --env=prod --no-debug
             php bin/console doctrine:migrations:migrate --no-interaction --env=prod
+            php bin/console assets:install public --env=prod --no-debug
+
+            # Restart web server
+            sudo systemctl restart apache2
