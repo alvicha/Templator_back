@@ -58,10 +58,10 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
 
-          # Create deployment directory and set permissions
+          # Crear directorios y permisos
           ssh $USERNAME@$HOST "mkdir -p $DEPLOY_PATH/{var,public}"
 
-          # Sync files excluding development resources
+          # Sincronizar archivos excluyendo desarrollo
           rsync -avz --delete \
             --exclude='.git' \
             --exclude='.env.local' \
@@ -70,15 +70,15 @@ jobs:
             --exclude='phpunit.xml' \
             backend/ $USERNAME@$HOST:$DEPLOY_PATH
 
-          # Set proper permissions
+          # Ajustar permisos
           ssh $USERNAME@$HOST "sudo chown -R $USERNAME:www-data $DEPLOY_PATH"
           ssh $USERNAME@$HOST "sudo chmod -R 775 $DEPLOY_PATH/var"
           ssh $USERNAME@$HOST "sudo chmod -R 755 $DEPLOY_PATH/public"
 
-          # Configure Apache .htaccess
+          # Configurar .htaccess para Apache
           ssh $USERNAME@$HOST "echo -e '<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ index.php [QSA,L]\n</IfModule>' > $DEPLOY_PATH/public/.htaccess"
 
-          # Enable Apache modules
+          # Habilitar módulos Apache
           ssh $USERNAME@$HOST "sudo a2enmod rewrite headers"
 
       - name: Setup database and run migrations
@@ -92,39 +92,36 @@ jobs:
             sudo sed -i 's/^bind-address\s*=.*/bind-address = 0.0.0.0/' /etc/mysql/mysql.conf.d/mysqld.cnf
             sudo systemctl restart mysql
 
-            # Variables
             MYSQL_ROOT_USER="root"
             MYSQL_ROOT_PASS="${{ secrets.MYSQL_ROOT_PASSWORD }}"
             APP_DB="${{ secrets.MYSQL_DATABASE }}"
             APP_USER="${{ secrets.MYSQL_USER }}"
             APP_PASS="${{ secrets.MYSQL_PASSWORD }}"
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
-            SERVER_IP="$(hostname -I | awk '{print $1}')"
 
-            # Crear DB y usuario
+            # Crear base de datos y usuario
             mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "
-              CREATE DATABASE IF NOT EXISTS $APP_DB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+              CREATE DATABASE IF NOT EXISTS \`$APP_DB\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
               CREATE USER IF NOT EXISTS '$APP_USER'@'%' IDENTIFIED BY '$APP_PASS';
-              GRANT ALL PRIVILEGES ON $APP_DB.* TO '$APP_USER'@'%';
+              GRANT ALL PRIVILEGES ON \`$APP_DB\`.* TO '$APP_USER'@'%';
               FLUSH PRIVILEGES;
             "
 
-            # Obtener versión MySQL
+            # Obtener versión de MySQL para Doctrine
             MYSQL_VERSION=$(mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "SELECT VERSION();" -s --skip-column-names | cut -d'-' -f1)
 
-            # Configurar .env.local
-            cd "$DEPLOY_PATH"
+            # Configurar .env.local para producción
             cd "$DEPLOY_PATH"
             echo "APP_ENV=prod" > .env.local
             echo "APP_SECRET=${{ secrets.APP_SECRET }}" >> .env.local
             echo "DATABASE_URL=mysql://$APP_USER:$APP_PASS@127.0.0.1:3306/$APP_DB?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
 
-            # Dependencias y migraciones
-            /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+            # Instalar dependencias y ejecutar migraciones
+            composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
             php bin/console cache:clear --env=prod --no-debug
             php bin/console cache:warmup --env=prod --no-debug
             php bin/console doctrine:migrations:migrate --no-interaction --env=prod
             php bin/console assets:install public --env=prod --no-debug
 
-            # Reiniciar Apache
+            # Reiniciar Apache para aplicar cambios
             sudo systemctl restart apache2
