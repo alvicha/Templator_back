@@ -1,4 +1,4 @@
-name: Deploy Symfony API with MySQL
+name: Deploy Symfony API with MySQL DB
 
 on:
   push:
