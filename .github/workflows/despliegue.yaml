@@ -1,4 +1,4 @@
-name: Deploy Symfony API with MySQL
+name: Deploy Symfony API with MySQL DB
 
 on:
   push:
@@ -92,13 +92,14 @@ jobs:
             sudo sed -i 's/^bind-address\s*=.*/bind-address = 0.0.0.0/' /etc/mysql/mysql.conf.d/mysqld.cnf
             sudo systemctl restart mysql
 
+            sudo rm -rf "$DEPLOY_PATH"
+
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
             APP_DB="${{ secrets.MYSQL_DATABASE }}"
             APP_USER="${{ secrets.MYSQL_USER }}"
             MYSQL_ROOT_USER="root"
             MYSQL_ROOT_PASS="${{ secrets.MYSQL_ROOT_PASSWORD }}"
             
-            sudo rm -rf "$DEPLOY_PATH"
 
             # Crear base de datos si no existe
             mysql -u$MYSQL_ROOT_USER -p"$MYSQL_ROOT_PASS" -e "
