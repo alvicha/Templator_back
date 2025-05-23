@@ -113,7 +113,7 @@ jobs:
             "
 
             # Ir a directorio backend
-            cd ${{ secrets.DEPLOY_PATH }}/backend
+            cd ${{ secrets.DEPLOY_PATH }}
 
             # Crear archivo .env.local con configuración prod
             echo "APP_ENV=prod" > .env.local
@@ -123,9 +123,7 @@ jobs:
             # Instalación de dependencias optimizada para prod y migraciones
             /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
             php bin/console cache:clear --env=prod --no-debug
-            php bin/console cache:warmup --env=prod --no-debug
             php bin/console doctrine:migrations:migrate --no-interaction --env=prod
-            php bin/console assets:install public --env=prod --no-debug
 
             # Reiniciar Apache para aplicar cambios
             sudo systemctl restart apache2
