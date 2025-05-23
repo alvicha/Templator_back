@@ -80,10 +80,12 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             mysql -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" -e "
-            CREATE DATABASE IF NOT EXISTS proyecto CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-            CREATE USER IF NOT EXISTS 'templator'@'localhost' IDENTIFIED BY 'templator1234';
-            GRANT ALL PRIVILEGES ON proyecto.* TO 'templator'@'localhost';
-            FLUSH PRIVILEGES;
+              CREATE DATABASE IF NOT EXISTS proyecto CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+              CREATE USER IF NOT EXISTS 'templator'@'localhost' IDENTIFIED BY 'templator1234';
+              CREATE USER IF NOT EXISTS 'templator'@'127.0.0.1' IDENTIFIED BY 'templator1234';
+              GRANT ALL PRIVILEGES ON proyecto.* TO 'templator'@'localhost';
+              GRANT ALL PRIVILEGES ON proyecto.* TO 'templator'@'127.0.0.1';
+              FLUSH PRIVILEGES;
             "
             cd ${{ secrets.DEPLOY_PATH }}
             echo "DATABASE_URL=mysql://templator:templator1234@127.0.0.1:3306/proyecto?serverVersion=8.0&charset=utf8mb4" > .env.local
