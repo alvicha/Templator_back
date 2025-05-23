@@ -77,8 +77,10 @@ jobs:
           ssh $USERNAME@$HOST "sudo chmod -R 775 $DEPLOY_PATH/var"
           ssh $USERNAME@$HOST "sudo chmod -R 755 $DEPLOY_PATH/public"
 
-           # Configure Apache
+          # Configure Apache .htaccess
           ssh $USERNAME@$HOST "echo -e '<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ index.php [QSA,L]\n</IfModule>' > $DEPLOY_PATH/public/.htaccess"
+
+          # Enable Apache modules
           ssh $USERNAME@$HOST "sudo a2enmod rewrite headers"
 
       - name: Setup database and run migrations
@@ -88,48 +90,35 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd $DEPLOY_PATH
+            # Install MySQL client if needed
+            if ! command -v mysql &> /dev/null; then
+              sudo apt-get update
+              sudo apt-get install -y mysql-client
+            fi
 
-            # Configure MySQL access without password in command line
-            mysql_config="[client]\nuser=root\npassword=${{ secrets.MYSQL_ROOT_PASSWORD }}\nhost=localhost"
-            echo -e $mysql_config > ~/.my.cnf
-            chmod 600 ~/.my.cnf
-
-            # Get MySQL version safely
-            MYSQL_VERSION=$(mysql -e "SELECT VERSION();" -s | cut -d'-' -f1)
+            # Get actual MySQL version
+            MYSQL_VERSION=$(mysql -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" -e "SELECT VERSION();" -s | cut -d'-' -f1)
 
             # Database setup
-            mysql -e "
+            mysql -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" -e "
               CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-              CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '${{ secrets.DB_PASSWORD }}';
-              GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
+              CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '${{ secrets.DB_PASSWORD }}';
+              GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'%';
               FLUSH PRIVILEGES;
             "
 
-            # Create .env.local
-            cat > .env.local <<EOF
-            APP_ENV=prod
-            APP_SECRET=${{ secrets.APP_SECRET }}
-            DATABASE_URL=mysql://$DB_USER:${{ secrets.DB_PASSWORD }}@127.0.0.1:$MYSQL_PORT/$DB_NAME?serverVersion=$MYSQL_VERSION&charset=utf8mb4
-            EOF
+            # Create .env.local with proper configuration
+            cd $DEPLOY_PATH
+            echo "APP_ENV=prod" > .env.local
+            echo "APP_SECRET=${{ secrets.APP_SECRET }}" >> .env.local
+            echo "DATABASE_URL=mysql://$DB_USER:${{ secrets.DB_PASSWORD }}@127.0.0.1:$MYSQL_PORT/$DB_NAME?serverVersion=$MYSQL_VERSION&charset=utf8mb4" >> .env.local
 
-            # Install dependencies
+            # Production deployment tasks
             /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
-
-            # Verify Symfony console exists
-            if [ ! -f "bin/console" ]; then
-              echo "Error: bin/console not found"
-              exit 1
-            fi
-
-            # Run Symfony commands
             php bin/console cache:clear --env=prod --no-debug
             php bin/console cache:warmup --env=prod --no-debug
             php bin/console doctrine:migrations:migrate --no-interaction --env=prod
             php bin/console assets:install public --env=prod --no-debug
-
-            # Clean up sensitive file
-            rm -f ~/.my.cnf
 
             # Restart web server
             sudo systemctl restart apache2
