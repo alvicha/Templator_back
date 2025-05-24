@@ -92,8 +92,6 @@ jobs:
             sudo sed -i 's/^bind-address\s*=.*/bind-address = 0.0.0.0/' /etc/mysql/mysql.conf.d/mysqld.cnf
             sudo systemctl restart mysql
 
-            sudo rm -rf "$DEPLOY_PATH"
-
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
             APP_DB="${{ secrets.MYSQL_DATABASE }}"
             APP_USER="${{ secrets.MYSQL_USER }}"
