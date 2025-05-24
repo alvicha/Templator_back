@@ -177,7 +177,6 @@ final class PlantillasController extends AbstractController
             ->getQuery()
             ->getSingleScalarResult();
 
-        // Ahora sí hacemos la paginación
         $page = max(1, (int) $pageModel['page']);
         $size = (int) $pageModel['size'];
         $qb->setFirstResult(($page - 1) * $size)
@@ -185,6 +184,11 @@ final class PlantillasController extends AbstractController
 
         if (!empty($pageModel['orderBy'])) {
             $direction = strtoupper($pageModel['orientation']);
+            $allowedDirections = ['ASC', 'DESC'];
+
+            if (!in_array($direction, $allowedDirections)) {
+                $direction = 'ASC';
+            }
 
             if ($pageModel['orderBy'] === 'context') {
                 $qb->orderBy('c.code', $direction);
